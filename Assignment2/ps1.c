@@ -19,8 +19,10 @@ int main() {
 
     printf("Enter size of vector: ");
     scanf("%d", &n);
+
     printf("Enter scalar value to add: ");
     scanf("%f", &scalar);
+
     printf("Enter number of threads: ");
     scanf("%d", &num_threads);
 
