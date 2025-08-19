@@ -6,17 +6,22 @@ int main()
 {
     int i;
     float scalar = 5.0;
-    int SIZE;
+    int n;
+
     printf("Enter Size: ");
-    scanf("%d",&SIZE);
-    float vector[SIZE];
-    for (i = 0; i < SIZE; i++) 
+    scanf("%d",&n);
+    
+    float vector[n];
+
+    for (i = 0; i < n; i++) 
         vector[i] = i * 1.0;
     double start = omp_get_wtime();
+
+
     #pragma omp parallel
     {
         #pragma omp for schedule(static, 10) nowait
-        for (i = 0; i < SIZE; i++) 
+        for (i = 0; i < n; i++) 
         {
             vector[i] += scalar;
         }

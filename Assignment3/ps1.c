@@ -4,28 +4,34 @@
 
 int main() {
     int i;
-    int SIZE;
+    int n;
+
     printf("Enter Size: ");
-    scanf("%d",&SIZE);
-    int *a = malloc(SIZE * sizeof(int));
-    int *b = malloc(SIZE * sizeof(int));
-    long long dot_product = 0;
+    scanf("%d",&n);
+
+    int *a = malloc(n * sizeof(int));
+    int *b = malloc(n * sizeof(int));
+
+    long long dot = 0;
     
-    for (i = 0; i < SIZE; i++) {
+    for (i = 0; i < n; i++) {
         a[i] = i % 100;
-        b[i] = (SIZE - i) % 100;
+        b[i] = (n - i) % 100;
     }
 
     double start = omp_get_wtime();
-    #pragma omp parallel for reduction(+:dot_product)
-    for (i = 0; i < SIZE; i++) {
-        dot_product += a[i] * b[i];
+
+    #pragma omp parallel for reduction(+:dot)
+    for (i = 0; i < n; i++) {
+        dot += a[i] * b[i];
     }
 
     double end = omp_get_wtime();
-    printf("Minimum Scalar Product: %lld\n", dot_product);
+    printf("Minimum Scalar Product: %lld\n", dot);
     printf("Time Taken: %f seconds\n", end - start);
+
     free(a);
     free(b);
+    
     return 0;
 }
