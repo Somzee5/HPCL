@@ -1,29 +1,32 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
+#include <cstdlib>
 #include <omp.h>
+using namespace std;
 
+#define N 500
 
 int main() {
-    int N = 500;
-    int A[N][N], x[N], y[N];
+    static int A[N][N], x[N], y[N];
+    int i, j;   
 
-    for (int i = 0; i < N; i++) {
+    for (i = 0; i < N; i++) {
         x[i] = rand() % 10;
-        for (int j = 0; j < N; j++)
+        for (j = 0; j < N; j++)
             A[i][j] = rand() % 10;
     }
 
     double st = omp_get_wtime();
 
-    #pragma omp parallel for private(i, j) shared(A, x, y)
-    for (int i = 0; i < N; i++) {
+    #pragma omp parallel for private(j) shared(A, x, y)
+    for (i = 0; i < N; i++) {
         y[i] = 0;
-        for (int j = 0; j < N; j++)
+        for (j = 0; j < N; j++)
             y[i] += A[i][j] * x[j];
     }
 
     double end = omp_get_wtime();
-    printf("Matrix-Vector Multiplication completed in %f seconds\n", end - st);
+    cout << "Matrix-Vector Multiplication completed in "
+         << (end - st) << " seconds\n";
 
     return 0;
 }
