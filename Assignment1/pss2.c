@@ -12,10 +12,8 @@ int main() {
         printf("Hello, World - Iteration %d\n", i);
     }
 
-    // Set the number of threads
     omp_set_num_threads(num_threads);
 
-    // Parallel printing using OpenMP
     printf("\nParallel printing:\n");
     #pragma omp parallel
     {
