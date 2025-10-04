@@ -15,7 +15,7 @@ int main() {
 
     double st = omp_get_wtime();
 
-    #pragma omp parallel for shared(A, scalar)
+    #pragma omp parallel for collapse(2) shared(A, scalar)
     for (int i = 0; i < R; i++)
         for (int j = 0; j < C; j++)
             A[i][j] *= scalar;
