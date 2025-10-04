@@ -9,6 +9,7 @@
 # Ignore temporary files
 *.log
 *.tmp
+*.csv
 
 # Ignore OS-specific files
 .DS_Store
