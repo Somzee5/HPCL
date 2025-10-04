@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <omp.h>
 
-void matrix_add(int size) 
+void matrix_add(int size, int threads) 
 {
     int i, j;
     double **a = malloc(size * sizeof(double *));
@@ -21,6 +21,8 @@ void matrix_add(int size)
         }
     }
 
+    omp_set_num_threads(threads);
+
     double start = omp_get_wtime();
     #pragma omp parallel for collapse(2)
     for (i = 0; i < size; i++) 
@@ -30,11 +32,10 @@ void matrix_add(int size)
             c[i][j] = a[i][j] + b[i][j];
         }
     }
-
     double end = omp_get_wtime();
-    printf("Size: %d, Time: %f seconds\n", size, end - start);
 
-    printf("Size: %d, Time: %f seconds\n", size, end - start);
+    printf("Size: %d, Threads: %d, Time: %f seconds\n", size, threads, end - start);
+
     for (i = 0; i < size; i++) 
     {
         free(a[i]);
@@ -48,8 +49,28 @@ void matrix_add(int size)
 
 int main() {
     int sizes[] = {250, 500, 750, 1000, 2000};
-    for (int i = 0; i < 5; i++) {
-        matrix_add(sizes[i]);
+    int thread_counts[] = {1, 2, 4, 8};
+
+    for (int s = 0; s < 5; s++) {
+        double serial_time = 0.0;
+
+        int size = sizes[s];
+        omp_set_num_threads(1);
+        double start = omp_get_wtime();
+        matrix_add(size, 1);
+        double end = omp_get_wtime();
+        serial_time = end - start;
+
+        for (int t = 1; t < 4; t++) {
+            int threads = thread_counts[t];
+            start = omp_get_wtime();
+            matrix_add(size, threads);
+            end = omp_get_wtime();
+            double parallel_time = end - start;
+            double speedup = serial_time / parallel_time;
+            printf("Size: %d, Threads: %d, Speedup: %.2f\n", size, threads, speedup);
+        }
+        printf("\n");
     }
     return 0;
 }
