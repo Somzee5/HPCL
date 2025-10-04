@@ -1,0 +1,15 @@
+.vscode/
+
+# Ignore build and binary files
+*.exe
+*.o
+*.obj
+*.out
+
+# Ignore temporary files
+*.log
+*.tmp
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
