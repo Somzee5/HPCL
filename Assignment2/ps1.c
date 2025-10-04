@@ -1,4 +1,3 @@
-// vector_scalar_add.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
@@ -8,11 +7,13 @@ void vector_scalar_addition(float *a, float scalar, int n, int num_threads)
     #pragma omp parallel for num_threads(num_threads)
     for (int i = 0; i < n; i++) 
     {
+        printf("Thread %d processing element %d\n", omp_get_thread_num(), i);
         a[i] += scalar;
     }
 }
 
-int main() {
+int main() 
+{
     int n;
     float scalar;
     int num_threads;
