@@ -1,8 +1,8 @@
-// ps1_fixed.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <sys/time.h>
 #include <mpi.h>
 
 #define DEFAULT_ITERATIONS 1
@@ -32,10 +32,12 @@ int conv(int * sub_grid, int i, int nrows, int DIM, int * kernel, int kernel_dim
 
   //convolve left and right columns
   for (int j = 1; j < (num_pads + 1); j++) {
+    //get last element of current row
     int end = (((i / DIM) + 1) * DIM) - 1;
-    if (i + j - end <= 0) {
+    if (i + j - end <= 0) { //if column is valid
       counter = counter + conv_column(sub_grid, i + j, nrows, DIM, kernel, kernel_dim);
     }
+    //get first element of current row
     int first = (i / DIM) * DIM;
     if (i - j - first >= 0) {
       counter = counter + conv_column(sub_grid, i - j, nrows, DIM, kernel, kernel_dim);
@@ -57,10 +59,9 @@ int * check(int * sub_grid, int nrows, int DIM, int * kernel, int kernel_dim) {
 }
 
 int main ( int argc, char** argv ) {
-  // initialize MPI first
-  MPI_Init(&argc, &argv);
-
-  int num_procs, ID;
+  // MPI Standard variable
+  int num_procs;
+  int ID, j;
   int iters = 0;
   int num_iterations;
   int DIM;
@@ -78,50 +79,45 @@ int main ( int argc, char** argv ) {
       num_iterations = atoi(argv[3]);
     }
   } else {
-    // Only rank 0 prints user-facing messages
-    MPI_Comm_rank(MPI_COMM_WORLD, &ID);
-    if (ID == 0) {
-      fprintf(stderr, "Usage: %s <DIM> <KERNEL_DIM> [iterations]\n", argv[0]);
-      fprintf(stderr, "Example: mpirun -np 4 %s 1024 3 1\n", argv[0]);
-    }
+    printf("Invalid command line arguments");
     MPI_Finalize();
-    exit(EXIT_FAILURE);
+    exit(-1);
   }
-
-  MPI_Comm_size ( MPI_COMM_WORLD, &num_procs );
-  MPI_Comm_rank ( MPI_COMM_WORLD, &ID );
-
-  // sanity: DIM must be divisible by num_procs
-  if (DIM % num_procs != 0) {
-    if (ID == 0) {
-      fprintf(stderr, "Error: DIM (%d) must be divisible by number of processes (%d)\n", DIM, num_procs);
-    }
-    MPI_Finalize();
-    exit(EXIT_FAILURE);
+  int main_grid[GRID_WIDTH];
+  memset(main_grid, 0, GRID_WIDTH*sizeof(int));
+  for(int i = 0; i < GRID_WIDTH; i++) {
+    main_grid[i] = 1;
   }
-
-  int *main_grid = malloc(sizeof(int) * GRID_WIDTH);
-  if (!main_grid) {
-    if (ID == 0) fprintf(stderr, "malloc failed\n");
-    MPI_Finalize();
-    exit(EXIT_FAILURE);
-  }
-  for(int i = 0; i < GRID_WIDTH; i++) main_grid[i] = 1;
 
   int num_pads = (KERNEL_DIM - 1) / 2;
 
-  int *kernel = malloc(sizeof(int) * KERNEL_SIZE);
-  if (!kernel) {
-    free(main_grid);
-    MPI_Finalize();
-    exit(EXIT_FAILURE);
+  int kernel[KERNEL_SIZE];
+  memset(kernel, 0, KERNEL_SIZE*sizeof(int));
+  for(int i = 0; i < KERNEL_SIZE; i++) {
+    kernel[i] = 1;
   }
-  for(int i = 0; i < KERNEL_SIZE; i++) kernel[i] = 1;
-
+  // Messaging variables
   MPI_Status status;
 
-  double start_time = MPI_Wtime();
+  // MPI Setup
+   MPI_Init( NULL, NULL);
+//   if ( MPI_Init( &argc, &argv ) != MPI_SUCCESS )
+//   {
+//     printf ( "MPI_Init error\n" );
+//   }
 
+  MPI_Comm_size ( MPI_COMM_WORLD, &num_procs ); // Set the num_procs
+  MPI_Comm_rank ( MPI_COMM_WORLD, &ID );
+
+  double start_time = MPI_Wtime();
+  assert ( DIM % num_procs == 0 );
+
+  int upper[DIM * num_pads];
+  int lower[DIM * num_pads];
+  
+  int * pad_row_upper;
+  int * pad_row_lower;
+  
   int start = (DIM / num_procs) * ID;
   int end = (DIM / num_procs) - 1 + start;
   int nrows = end + 1 - start;
@@ -130,20 +126,11 @@ int main ( int argc, char** argv ) {
   
   for ( iters = 0; iters < num_iterations; iters++ ) {
 
-    int *pad_row_lower = malloc(sizeof(int) * DIM * num_pads);
-    int *pad_row_upper = malloc(sizeof(int) * DIM * num_pads);
-    if (!pad_row_lower || !pad_row_upper) {
-      if (ID == 0) fprintf(stderr, "malloc failed for pad rows\n");
-      free(main_grid); free(kernel);
-      MPI_Finalize();
-      exit(EXIT_FAILURE);
-    }
-
-    int upper[DIM * num_pads];
-    int lower[DIM * num_pads];
-
     memcpy(lower, &main_grid[DIM * (end - num_pads + 1)], sizeof(int) * DIM * num_pads);
+    pad_row_lower = malloc(sizeof(int) * DIM * num_pads);
+    
     memcpy(upper, &main_grid[DIM * start], sizeof(int) * DIM * num_pads);
+    pad_row_upper = malloc(sizeof(int) * DIM * num_pads);
 
     if(num_procs > 1) {
       if(ID % 2 == 1) {
@@ -161,31 +148,20 @@ int main ( int argc, char** argv ) {
         MPI_Recv(pad_row_upper, DIM * num_pads, MPI_INT, prev, 0, MPI_COMM_WORLD, &status);
       }
     } else {
-      // if only 1 proc, just reuse neighbors as wrap-around (or zero-pad)
-      memcpy(pad_row_lower, upper, sizeof(int) * DIM * num_pads);
-      memcpy(pad_row_upper, lower, sizeof(int) * DIM * num_pads);
+      pad_row_lower = upper;
+      pad_row_upper = lower;
     }
 
-    int sub_grid_size = DIM * (nrows + (2 * num_pads));
-    int *sub_grid = malloc(sizeof(int) * sub_grid_size);
-    if (!sub_grid) {
-      if (ID == 0) fprintf(stderr, "malloc failed for sub_grid\n");
-      free(pad_row_lower); free(pad_row_upper); free(main_grid); free(kernel);
-      MPI_Finalize();
-      exit(EXIT_FAILURE);
-    }
-
+    int sub_grid[DIM * (nrows + (2 * num_pads))];
     if (ID == 0) {
-      memset(pad_row_upper, 0, DIM * sizeof(int) * num_pads);
+      memset(pad_row_upper, 0, DIM*sizeof(int)*num_pads);
     }
     if (ID == (num_procs - 1)) {
-      memset(pad_row_lower, 0, DIM * sizeof(int) * num_pads);
+      memset(pad_row_lower, 0, DIM*sizeof(int)*num_pads);
     }
-
     memcpy(sub_grid, pad_row_upper, sizeof(int) * DIM * num_pads); 
     memcpy(&sub_grid[DIM * num_pads], &main_grid[DIM * start], sizeof(int) * DIM * nrows);    
     memcpy(&sub_grid[DIM * (nrows + num_pads)], pad_row_lower, sizeof(int) * DIM * num_pads);
-
     int * changed_subgrid = check(sub_grid, nrows, DIM, kernel, KERNEL_DIM);
 
     if(ID != 0) {
@@ -206,20 +182,28 @@ int main ( int argc, char** argv ) {
       
     }
 
-    if ( ID == 0 ) { 
-      double end_time = MPI_Wtime();
-      printf("Execution Time: %f\n", end_time - start_time);
-    }
+   // Output the updated grid state
+     if ( ID == 0 ) { 
+        double end = MPI_Wtime();
+      //   printf("Matrix DIM: %d\n", DIM);
+      //   printf("Kernel DIM: %d", KERNEL_DIM);
+      //   printf ( "\nConvolution Output: \n"); 
+      //   for ( j = 0; j < GRID_WIDTH; j++ ) { 
+      //     if ( j % DIM == 0 ) { 
+      //       printf( "\n" ); 
+      //     } 
+      //     printf ( "%d  ", main_grid[j] ); 
+      //  } 
+      //   printf( "\n" ); 
 
-    free(sub_grid);
-    free(changed_subgrid);
-    free(pad_row_lower);
-    free(pad_row_upper);
+        printf("Execution Time: %f\n",end - start_time);
+     }
   }
 
-  free(main_grid);
-  free(kernel);
+  if(num_procs >= 2) {
+    free(pad_row_upper);
+    free(pad_row_lower);
+  }
 
   MPI_Finalize();
-  return 0;
 }
