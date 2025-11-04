@@ -16,7 +16,7 @@ double compute_pi(int num_steps, int num_threads)
 }
 
 int main() {
-    int num_steps;
+    int num_steps; 
     int num_threads;
 
     printf("Enter number of steps: ");
